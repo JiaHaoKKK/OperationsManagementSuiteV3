@@ -1,5 +1,7 @@
 syntax = "proto3";
 import "google/protobuf/any.proto";
+option java_package="com.rengu.operationsmanagementsuitev3.Entity";
+option java_outer_classname="SimsssEntitys";
 message DSEString
 {
    string v = 1;

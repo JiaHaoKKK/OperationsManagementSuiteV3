@@ -28,12 +28,12 @@ import static com.rengu.operationsmanagementsuitev3.Enums.SimCmd.*;
 @Slf4j
 @Service
 public class SimEngineService {
-    public static final String CMD_SUBJECT = "CMD_TOPIC1";
-    public static final String ENTITY_LIST_TOPIC = "ENTITY_LIST_TOPIC";
-    public static final String EVENT_LIST_TOPIC = "EVENT_LIST_TOPIC";
+    private static final String CMD_SUBJECT = "CMD_TOPIC1";
+    private static final String ENTITY_LIST_TOPIC = "ENTITY_LIST_TOPIC";
+    private static final String EVENT_LIST_TOPIC = "EVENT_LIST_TOPIC";
 
-    private Connection connectNats(String natsIp) throws IOException, InterruptedException {
-        return Nats.connect("nats://" + natsIp + ":4222");
+    private Connection connectNats() throws IOException, InterruptedException {
+        return Nats.connect("nats://" + ApplicationConfig.NATS_SERVER_IP + ":4222");
     }
 
 
@@ -41,6 +41,8 @@ public class SimEngineService {
         SimData.DSERECCommand.Builder builder = SimData.DSERECCommand.newBuilder();
         switch (simCmd) {
             case "start":
+            case "stepThrough":
+            case "stepSize":
                 builder.setCmdType(CMD_ENGINE_START.ordinal());
                 break;
             case "suspend":
@@ -56,33 +58,48 @@ public class SimEngineService {
                 throw new RuntimeException(simCmd + CMD_TYPE_ERROR);
         }
         SimData.DSERECCommand dserecCommand = builder.build();
-        sendSimCmd(CMD_SUBJECT, dserecCommand);
+        sendSimCmd(dserecCommand);
+        if (simCmd.equals("stepThrough") || simCmd.equals("stepSize")) {
+            Thread.sleep(2000);//毫秒
+            getSimEngineCmd("suspend");
+        }
+
     }
 
     //  发送消息给引擎
-    private void sendSimCmd(String subject, SimData.DSERECCommand dserecCommand) throws IOException, InterruptedException {
-        Connection connection = connectNats(ApplicationConfig.NATS_SERVER_IP);
-        connection.publish(subject, dserecCommand.toByteArray());
+    private void sendSimCmd(SimData.DSERECCommand dserecCommand) throws IOException, InterruptedException {
+        Connection connection = connectNats();
+        connection.publish(SimEngineService.CMD_SUBJECT, dserecCommand.toByteArray());
     }
 
     @Async
     public void subscribeEntityMessage() {
         try {
             log.info("OMS服务器-引擎实体信息监听线程：" + ENTITY_LIST_TOPIC + "@" + ApplicationConfig.NATS_SERVER_IP);
-            Connection connection = connectNats(ApplicationConfig.NATS_SERVER_IP);
-            Dispatcher dispatcher = connection.createDispatcher(this::entityMessageHandler);
+            Connection connection = connectNats();
+            Dispatcher dispatcher = connection.createDispatcher(this::parentEntityMessageHandler);
             dispatcher.subscribe(ENTITY_LIST_TOPIC);
+            Dispatcher dispatchers = connection.createDispatcher(this::subEntityMessageHandler);
+            dispatchers.subscribe(ENTITY_LIST_TOPIC);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     //  订阅实体类信息
+    private void parentEntityMessageHandler(Message message) {
+        entityMessageHandler(message);
+    }
+
+    //  子类结构
+    private void subEntityMessageHandler(Message message) {
+        entityMessageHandler(message);
+    }
+
     private void entityMessageHandler(Message message) {
+        List<SimEntity> simEntityList = new ArrayList<>();
         try {
             SimData.DSERECEntityRecord dserecEntityRecord = SimData.DSERECEntityRecord.parseFrom(message.getData());
-            List<SimEntity> simEntityList = new ArrayList<>();
-
             for (SimData.DSERECEntity dserecEntity : dserecEntityRecord.getEntityListList()) {
                 SimEntity simEntity = new SimEntity();
                 simEntity.setEntityID(dserecEntity.getEntityID());
@@ -108,9 +125,7 @@ public class SimEngineService {
                 simEntityList.add(simEntity);
             }
             log.info(JsonUtils.toJson(simEntityList));
-        } catch (InvalidProtocolBufferException e) {
-            e.printStackTrace();
-        } catch (JsonProcessingException e) {
+        } catch (InvalidProtocolBufferException | JsonProcessingException e) {
             e.printStackTrace();
         }
     }
@@ -119,7 +134,7 @@ public class SimEngineService {
     public void subscribeEventMessage() {
         try {
             log.info("OMS服务器-引擎事件信息监听线程：" + EVENT_LIST_TOPIC + "@" + ApplicationConfig.NATS_SERVER_IP);
-            Connection connection = connectNats(ApplicationConfig.NATS_SERVER_IP);
+            Connection connection = connectNats();
             Dispatcher dispatcher = connection.createDispatcher(this::eventMessageHandler);
             dispatcher.subscribe(EVENT_LIST_TOPIC);
         } catch (Exception e) {

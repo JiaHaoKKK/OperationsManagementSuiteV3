@@ -28,9 +28,7 @@ public class SimEngineController {
     public void getSimEngineCmd(@RequestParam(value = "simEngineCmd") String simEngineCmd) {
         try {
             simEngineService.getSimEngineCmd(simEngineCmd);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
