@@ -1,3 +1,4 @@
+/*
 package com.rengu.operationsmanagementsuitev3;
 
 import org.junit.Test;
@@ -14,3 +15,4 @@ public class OperationsManagementSuiteV3ApplicationTests {
     }
 
 }
+*/

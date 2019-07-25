@@ -1,11 +1,12 @@
 package com.rengu.operationsmanagementsuitev3.Controller;
 
+import com.rengu.operationsmanagementsuitev3.Entity.ResultEntity;
 import com.rengu.operationsmanagementsuitev3.Service.SimEngineService;
+import com.rengu.operationsmanagementsuitev3.Utils.ResultUtils;
+import javafx.scene.chart.ValueAxis;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 
@@ -24,12 +25,13 @@ public class SimEngineController {
         this.simEngineService = simEngineService;
     }
 
-    @PostMapping
-    public void getSimEngineCmd(@RequestParam(value = "simEngineCmd") String simEngineCmd) {
+    @PostMapping("/{deviceID}")
+    public ResultEntity getSimEngineCmd(@PathVariable(value = "deviceID")String deviceID, @RequestParam(value = "simEngineCmd") String simEngineCmd) {
         try {
-            simEngineService.getSimEngineCmd(simEngineCmd);
+            simEngineService.getSimEngineCmd(simEngineCmd,deviceID);
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+        return  ResultUtils.build(simEngineCmd+" 指令发送成功");
     }
 }

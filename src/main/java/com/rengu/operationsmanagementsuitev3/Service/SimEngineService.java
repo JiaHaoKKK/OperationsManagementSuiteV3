@@ -11,6 +11,8 @@ import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import io.nats.client.Nats;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -31,14 +33,21 @@ public class SimEngineService {
     private static final String CMD_SUBJECT = "CMD_TOPIC1";
     private static final String ENTITY_LIST_TOPIC = "ENTITY_LIST_TOPIC";
     private static final String EVENT_LIST_TOPIC = "EVENT_LIST_TOPIC";
+    private final SimpMessagingTemplate simpMessagingTemplate;
+    private static  String deviceId = null;
+
+    public SimEngineService(SimpMessagingTemplate simpMessagingTemplate) {
+        this.simpMessagingTemplate = simpMessagingTemplate;
+    }
 
     private Connection connectNats() throws IOException, InterruptedException {
         return Nats.connect("nats://" + ApplicationConfig.NATS_SERVER_IP + ":4222");
     }
 
 
-    public void getSimEngineCmd(String simCmd) throws IOException, InterruptedException {
+    public void getSimEngineCmd(String simCmd, String deviceID) throws IOException, InterruptedException {
         SimData.DSERECCommand.Builder builder = SimData.DSERECCommand.newBuilder();
+        deviceId = deviceID;
         switch (simCmd) {
             case "start":
             case "stepThrough":
@@ -61,7 +70,7 @@ public class SimEngineService {
         sendSimCmd(dserecCommand);
         if (simCmd.equals("stepThrough") || simCmd.equals("stepSize")) {
             Thread.sleep(2000);//毫秒
-            getSimEngineCmd("suspend");
+            getSimEngineCmd("suspend", deviceID);
         }
 
     }
@@ -124,6 +133,8 @@ public class SimEngineService {
                 simEntity.setCommander(dserecEntity.getCommander());
                 simEntityList.add(simEntity);
             }
+
+            simpMessagingTemplate.convertAndSend("/simEngine/" + deviceId, JsonUtils.toJson(simEntityList));
             log.info(JsonUtils.toJson(simEntityList));
         } catch (InvalidProtocolBufferException | JsonProcessingException e) {
             e.printStackTrace();
